@@ -1,4 +1,4 @@
-package com.shipmonk.testingday.dto;
+package com.shipmonk.testingday.external;
 
 
 import java.util.Map;
@@ -78,5 +78,17 @@ public class FixerResponse {
 
     public void setRates(Map<String, Double> rates) {
         this.rates = rates;
+    }
+
+    @Override
+    public String toString() {
+        return "FixerResponse{" +
+            "success=" + success +
+            ", historical=" + historical +
+            ", date='" + date + '\'' +
+            ", timestamp=" + timestamp +
+            ", base='" + base + '\'' +
+            ", rates=" + rates +
+            '}';
     }
 }
