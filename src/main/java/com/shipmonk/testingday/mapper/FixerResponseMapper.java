@@ -1,5 +1,7 @@
 package com.shipmonk.testingday.mapper;
 
+import com.shipmonk.testingday.dto.ExchangeRatesCacheDto;
+import com.shipmonk.testingday.dto.ExchangeRateValueDto;
 import com.shipmonk.testingday.entity.ExchangeRatesCache;
 import com.shipmonk.testingday.entity.ExchangeRatesCacheId;
 import com.shipmonk.testingday.entity.ExchangeRateValue;
@@ -12,7 +14,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Mapper class for converting FixerResponse to ExchangeRatesCache and ExchangeRateValue entities
@@ -22,14 +27,16 @@ public class FixerResponseMapper {
     private static final Logger logger = LoggerFactory.getLogger(FixerResponseMapper.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+    // ==================== DTO Conversion Methods ====================
+
     /**
-     * Converts a FixerResponse to ExchangeRatesCache entity with all exchange rate values
+     * Converts a FixerResponse to ExchangeRatesCacheDto
      *
      * @param fixerResponse The Fixer API response
-     * @return ExchangeRatesCache entity populated with data from the response
+     * @return ExchangeRatesCacheDto populated with data from the response
      * @throws IllegalArgumentException if fixerResponse is null or invalid
      */
-    public static ExchangeRatesCache toExchangeRatesCache(FixerResponse fixerResponse) {
+    public static ExchangeRatesCacheDto toDto(FixerResponse fixerResponse) {
         if (fixerResponse == null) {
             throw new IllegalArgumentException("FixerResponse cannot be null");
         }
@@ -57,165 +64,197 @@ public class FixerResponseMapper {
 
         String baseCurrency = fixerResponse.getBase();
 
-        // Create the cache entity with composite ID
-        ExchangeRatesCacheId cacheId = new ExchangeRatesCacheId(date, baseCurrency);
-        ExchangeRatesCache cache = new ExchangeRatesCache(cacheId);
+        // Create the DTO
+        ExchangeRatesCacheDto dto = new ExchangeRatesCacheDto(date, baseCurrency);
 
-        // Convert all rates to ExchangeRateValue entities
+        // Convert all rates to ExchangeRateValueDto objects
         if (fixerResponse.getRates() != null && !fixerResponse.getRates().isEmpty()) {
+            List<ExchangeRateValueDto> rateDtos = new ArrayList<>();
+
             for (Map.Entry<String, Double> rateEntry : fixerResponse.getRates().entrySet()) {
                 String targetCurrency = rateEntry.getKey();
                 Double rateValue = rateEntry.getValue();
 
-                if (targetCurrency != null && !targetCurrency.isEmpty() && rateValue != null) {
-                    ExchangeRateValue exchangeRateValue = toExchangeRateValue(
-                        date,
-                        baseCurrency,
+                if (targetCurrency != null && !targetCurrency.isEmpty() && rateValue != null && rateValue > 0) {
+                    ExchangeRateValueDto rateDto = new ExchangeRateValueDto(
                         targetCurrency,
-                        rateValue
+                        BigDecimal.valueOf(rateValue)
                     );
-                    cache.addExchangeRateValue(exchangeRateValue);
+                    rateDtos.add(rateDto);
                 } else {
                     logger.warn("Skipping invalid rate entry: currency={}, rate={}", targetCurrency, rateValue);
                 }
             }
 
-            logger.info("Converted FixerResponse to ExchangeRatesCache with {} rate values",
-                cache.getExchangeRateValues().size());
+            dto.setRates(rateDtos);
+            logger.info("Converted FixerResponse to ExchangeRatesCacheDto with {} rate values", rateDtos.size());
         } else {
             logger.warn("FixerResponse contains no rates data");
+        }
+
+        return dto;
+    }
+
+    /**
+     * Converts ExchangeRatesCacheDto to FixerResponse
+     *
+     * @param dto The ExchangeRatesCacheDto
+     * @return FixerResponse object
+     */
+    public static FixerResponse toFixerResponse(ExchangeRatesCacheDto dto) {
+        if (dto == null) {
+            throw new IllegalArgumentException("ExchangeRatesCacheDto cannot be null");
+        }
+
+        if (dto.getDate() == null) {
+            throw new IllegalArgumentException("ExchangeRatesCacheDto date cannot be null");
+        }
+
+        if (dto.getBaseCurrency() == null || dto.getBaseCurrency().isEmpty()) {
+            throw new IllegalArgumentException("ExchangeRatesCacheDto base currency cannot be null or empty");
+        }
+
+        FixerResponse response = new FixerResponse();
+        response.setSuccess(true);
+        response.setHistorical(true);
+        response.setDate(dto.getDate().format(DATE_FORMATTER));
+        response.setBase(dto.getBaseCurrency());
+
+        // Convert rate DTOs to map
+        Map<String, Double> rates = new java.util.HashMap<>();
+        if (dto.getRates() != null) {
+            for (ExchangeRateValueDto rateDto : dto.getRates()) {
+                if (rateDto.getTargetCurrency() != null && rateDto.getRate() != null) {
+                    rates.put(rateDto.getTargetCurrency(), rateDto.getRate().doubleValue());
+                }
+            }
+        }
+        response.setRates(rates);
+
+        // Set timestamp
+        response.setTimestamp(System.currentTimeMillis() / 1000);
+
+        return response;
+    }
+
+    /**
+     * Converts ExchangeRatesCache entity to ExchangeRatesCacheDto
+     *
+     * @param entity The ExchangeRatesCache entity
+     * @return ExchangeRatesCacheDto
+     */
+    public static ExchangeRatesCacheDto entityToDto(ExchangeRatesCache entity) {
+        if (entity == null || entity.getId() == null) {
+            throw new IllegalArgumentException("ExchangeRatesCache or its ID cannot be null");
+        }
+
+        ExchangeRatesCacheDto dto = new ExchangeRatesCacheDto(
+            entity.getId().getDate(),
+            entity.getId().getBaseCurrency()
+        );
+
+        // Convert exchange rate values to DTOs
+        if (entity.getExchangeRateValues() != null) {
+            List<ExchangeRateValueDto> rateDtos = entity.getExchangeRateValues().stream()
+                .filter(value -> value.getId() != null && value.getRate() != null)
+                .map(value -> new ExchangeRateValueDto(
+                    value.getId().getTargetCurrency(),
+                    value.getRate()
+                ))
+                .collect(Collectors.toList());
+
+            dto.setRates(rateDtos);
+        }
+
+        return dto;
+    }
+
+    /**
+     * Converts ExchangeRatesCacheDto to ExchangeRatesCache entity
+     *
+     * @param dto The ExchangeRatesCacheDto
+     * @return ExchangeRatesCache entity
+     */
+    public static ExchangeRatesCache dtoToEntity(ExchangeRatesCacheDto dto) {
+        if (dto == null) {
+            throw new IllegalArgumentException("ExchangeRatesCacheDto cannot be null");
+        }
+
+        if (dto.getDate() == null) {
+            throw new IllegalArgumentException("ExchangeRatesCacheDto date cannot be null");
+        }
+
+        if (dto.getBaseCurrency() == null || dto.getBaseCurrency().isEmpty()) {
+            throw new IllegalArgumentException("ExchangeRatesCacheDto base currency cannot be null or empty");
+        }
+
+        // Create the cache entity with composite ID
+        ExchangeRatesCacheId cacheId = new ExchangeRatesCacheId(dto.getDate(), dto.getBaseCurrency());
+        ExchangeRatesCache cache = new ExchangeRatesCache(cacheId);
+
+        // Convert rate DTOs to entities
+        if (dto.getRates() != null) {
+            for (ExchangeRateValueDto rateDto : dto.getRates()) {
+                if (rateDto.getTargetCurrency() != null && rateDto.getRate() != null) {
+                    ExchangeRateValueId valueId = new ExchangeRateValueId(
+                        dto.getDate(),
+                        dto.getBaseCurrency(),
+                        rateDto.getTargetCurrency()
+                    );
+                    ExchangeRateValue value = new ExchangeRateValue(valueId, rateDto.getRate());
+                    cache.addExchangeRateValue(value);
+                }
+            }
         }
 
         return cache;
     }
 
     /**
-     * Creates an ExchangeRateValue entity
-     *
-     * @param date The date of the exchange rate
-     * @param baseCurrency The base currency
-     * @param targetCurrency The target currency
-     * @param rate The exchange rate value
-     * @return ExchangeRateValue entity
-     */
-    public static ExchangeRateValue toExchangeRateValue(
-            LocalDate date,
-            String baseCurrency,
-            String targetCurrency,
-            Double rate) {
-
-        if (date == null) {
-            throw new IllegalArgumentException("Date cannot be null");
-        }
-        if (baseCurrency == null || baseCurrency.isEmpty()) {
-            throw new IllegalArgumentException("Base currency cannot be null or empty");
-        }
-        if (targetCurrency == null || targetCurrency.isEmpty()) {
-            throw new IllegalArgumentException("Target currency cannot be null or empty");
-        }
-        if (rate == null || rate <= 0) {
-            throw new IllegalArgumentException("Rate must be a positive number");
-        }
-
-        ExchangeRateValueId valueId = new ExchangeRateValueId(date, baseCurrency, targetCurrency);
-        BigDecimal rateAsBigDecimal = BigDecimal.valueOf(rate);
-
-        return new ExchangeRateValue(valueId, rateAsBigDecimal);
-    }
-
-    /**
-     * Converts a FixerResponse to ExchangeRatesCache with validation
+     * Converts a FixerResponse to ExchangeRatesCacheDto with validation
      * Returns null if conversion fails instead of throwing exception
      *
      * @param fixerResponse The Fixer API response
-     * @return ExchangeRatesCache entity or null if conversion fails
+     * @return ExchangeRatesCacheDto or null if conversion fails
      */
-    public static ExchangeRatesCache toExchangeRatesCacheSafe(FixerResponse fixerResponse) {
+    public static ExchangeRatesCacheDto toDtoSafe(FixerResponse fixerResponse) {
         try {
-            return toExchangeRatesCache(fixerResponse);
+            return toDto(fixerResponse);
         } catch (Exception e) {
-            logger.error("Failed to convert FixerResponse to ExchangeRatesCache", e);
+            logger.error("Failed to convert FixerResponse to ExchangeRatesCacheDto", e);
             return null;
         }
     }
 
     /**
-     * Validates that a FixerResponse can be converted to entities
+     * Converts a list of ExchangeRatesCache entities to DTOs
      *
-     * @param fixerResponse The response to validate
-     * @return true if valid, false otherwise
+     * @param entities The list of entities
+     * @return List of ExchangeRatesCacheDto
      */
-    public static boolean isValidForConversion(FixerResponse fixerResponse) {
-        if (fixerResponse == null) {
-            return false;
+    public static List<ExchangeRatesCacheDto> entitiesToDtos(List<ExchangeRatesCache> entities) {
+        if (entities == null) {
+            return new ArrayList<>();
         }
 
-        if (!fixerResponse.isSuccess()) {
-            logger.debug("FixerResponse validation failed: success=false");
-            return false;
-        }
-
-        if (fixerResponse.getDate() == null || fixerResponse.getDate().isEmpty()) {
-            logger.debug("FixerResponse validation failed: date is null or empty");
-            return false;
-        }
-
-        if (fixerResponse.getBase() == null || fixerResponse.getBase().isEmpty()) {
-            logger.debug("FixerResponse validation failed: base currency is null or empty");
-            return false;
-        }
-
-        // Try to parse the date
-        try {
-            LocalDate.parse(fixerResponse.getDate(), DATE_FORMATTER);
-        } catch (DateTimeParseException e) {
-            logger.debug("FixerResponse validation failed: invalid date format: {}", fixerResponse.getDate());
-            return false;
-        }
-
-        if (fixerResponse.getRates() == null || fixerResponse.getRates().isEmpty()) {
-            logger.debug("FixerResponse validation failed: no rates data");
-            return false;
-        }
-
-        return true;
+        return entities.stream()
+            .map(FixerResponseMapper::entityToDto)
+            .collect(Collectors.toList());
     }
 
     /**
-     * Converts FixerResponse back to entity format (reverse mapping)
-     * Useful for testing and data transformation
+     * Converts a list of DTOs to ExchangeRatesCache entities
      *
-     * @param cache The ExchangeRatesCache entity
-     * @return FixerResponse object
+     * @param dtos The list of DTOs
+     * @return List of ExchangeRatesCache entities
      */
-    public static FixerResponse toFixerResponse(ExchangeRatesCache cache) {
-        if (cache == null || cache.getId() == null) {
-            throw new IllegalArgumentException("ExchangeRatesCache or its ID cannot be null");
+    public static List<ExchangeRatesCache> dtosToEntities(List<ExchangeRatesCacheDto> dtos) {
+        if (dtos == null) {
+            return new ArrayList<>();
         }
 
-        FixerResponse response = new FixerResponse();
-        response.setSuccess(true);
-        response.setHistorical(true);
-        response.setDate(cache.getId().getDate().format(DATE_FORMATTER));
-        response.setBase(cache.getId().getBaseCurrency());
-
-        // Convert exchange rate values to map
-        Map<String, Double> rates = new java.util.HashMap<>();
-        if (cache.getExchangeRateValues() != null) {
-            for (ExchangeRateValue value : cache.getExchangeRateValues()) {
-                if (value.getId() != null && value.getRate() != null) {
-                    rates.put(
-                        value.getId().getTargetCurrency(),
-                        value.getRate().doubleValue()
-                    );
-                }
-            }
-        }
-        response.setRates(rates);
-
-        // Set timestamp (optional - can be null)
-        response.setTimestamp(System.currentTimeMillis() / 1000);
-
-        return response;
+        return dtos.stream()
+            .map(FixerResponseMapper::dtoToEntity)
+            .collect(Collectors.toList());
     }
 }
