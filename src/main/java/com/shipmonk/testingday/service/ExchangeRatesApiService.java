@@ -17,6 +17,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static java.time.LocalDate.of;
+
 @Service
 public class ExchangeRatesApiService {
 
@@ -127,6 +129,34 @@ public class ExchangeRatesApiService {
         if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
             throw new IllegalArgumentException("Invalid date format. Expected: YYYY-MM-DD, got: " + date);
         }
+
+        // Validate that the date is actually valid (e.g., not 2024-13-01 or 2024-01-32)
+        try {
+            String[] parts = date.split("-");
+            int year = Integer.parseInt(parts[0]);
+            int month = Integer.parseInt(parts[1]);
+            int day = Integer.parseInt(parts[2]);
+
+            // Check month is valid (1-12)
+            if (month < 1 || month > 12) {
+                throw new IllegalArgumentException(
+                    String.format("Invalid month: %d. Month must be between 1 and 12. Date: %s", month, date)
+                );
+            }
+
+            // Check day is valid for the given month and year
+            of(year, month, day); // This validates the actual date
+
+        } catch (java.time.DateTimeException e) {
+            throw new IllegalArgumentException(
+                String.format("Invalid date: %s. %s", date, e.getMessage()), e
+            );
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                String.format("Invalid date format: %s. Could not parse date components.", date), e
+            );
+        }
+
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalArgumentException("API key cannot be null or empty");
         }

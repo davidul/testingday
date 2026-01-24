@@ -429,6 +429,9 @@ class ExchangeRatesApiServiceTest {
             "01-01-2024",    // Wrong order
             "2024-13-01",    // Invalid month
             "2024-01-32",    // Invalid day
+            "2024-02-30",    // Invalid day for February
+            "2024-04-31",    // Invalid day for April (only has 30 days)
+            "2023-02-29",    // Invalid leap year date (2023 is not a leap year)
             "not-a-date"     // Not a date
         };
 
@@ -438,8 +441,55 @@ class ExchangeRatesApiServiceTest {
                 invalidDate, testBaseCurrency, testSymbols, testApiKey
             ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid date format");
+                .hasMessageContaining("Invalid date");
         }
+    }
+
+    @Test
+    void testFetchExchangeRatesAsync_InvalidMonth13_ThrowsException() {
+        // When/Then
+        assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
+            "2024-13-01", testBaseCurrency, testSymbols, testApiKey
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Invalid month: 13");
+    }
+
+    @Test
+    void testFetchExchangeRatesAsync_InvalidDay32_ThrowsException() {
+        // When/Then
+        assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
+            "2024-01-32", testBaseCurrency, testSymbols, testApiKey
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Invalid date: 2024-01-32");
+    }
+
+    @Test
+    void testFetchExchangeRatesAsync_LeapYearValidation_Valid() throws ExecutionException, InterruptedException {
+        // Given - 2024 is a leap year, so Feb 29 is valid
+        FixerResponse expectedResponse = createSuccessfulFixerResponse();
+        when(restTemplate.getForObject(anyString(), eq(FixerResponse.class)))
+            .thenReturn(expectedResponse);
+
+        // When - February 29, 2024 should be valid
+        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesAsync(
+            "2024-02-29", testBaseCurrency, testSymbols, testApiKey
+        );
+
+        // Then - Should not throw exception
+        FixerResponse result = future.get();
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void testFetchExchangeRatesAsync_LeapYearValidation_Invalid() {
+        // When/Then - 2023 is not a leap year
+        assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
+            "2023-02-29", testBaseCurrency, testSymbols, testApiKey
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Invalid date: 2023-02-29");
     }
 
     // ==================== Helper Methods ====================

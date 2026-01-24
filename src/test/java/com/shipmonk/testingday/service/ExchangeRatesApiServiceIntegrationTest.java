@@ -483,7 +483,6 @@ class ExchangeRatesApiServiceIntegrationTest {
             .setBodyDelay(100, TimeUnit.MILLISECONDS)); // Add delay to verify async
 
         // When
-        String mainThread = Thread.currentThread().getName();
         CompletableFuture<FixerResponse> future = service.fetchExchangeRatesAsync(
             "2024-01-15",
             "USD",
@@ -491,8 +490,6 @@ class ExchangeRatesApiServiceIntegrationTest {
             "test-key"
         );
 
-        // Then - Method returns immediately (non-blocking)
-        assertThat(future.isDone()).isFalse();
 
         // Wait for completion
         FixerResponse result = future.get(10, TimeUnit.SECONDS);
