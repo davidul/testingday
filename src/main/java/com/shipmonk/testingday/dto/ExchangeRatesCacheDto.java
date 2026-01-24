@@ -1,5 +1,6 @@
 package com.shipmonk.testingday.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +62,7 @@ public class ExchangeRatesCacheDto {
         this.rates.add(rate);
     }
 
-    public void addRate(String targetCurrency, java.math.BigDecimal rate) {
+    public void addRate(String targetCurrency, BigDecimal rate) {
         addRate(new ExchangeRateValueDto(targetCurrency, rate));
     }
 }
