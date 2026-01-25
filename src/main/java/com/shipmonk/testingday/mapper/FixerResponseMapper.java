@@ -153,6 +153,8 @@ public class FixerResponseMapper {
             entity.getId().getBaseCurrency()
         );
 
+        // Set execution date
+        dto.setExecDate(entity.getExecDate());
         // Convert exchange rate values to DTOs
         if (entity.getExchangeRateValues() != null) {
             List<ExchangeRateValueDto> rateDtos = entity.getExchangeRateValues().stream()
@@ -191,6 +193,9 @@ public class FixerResponseMapper {
         // Create the cache entity with composite ID
         ExchangeRatesCacheId cacheId = new ExchangeRatesCacheId(dto.getDate(), dto.getBaseCurrency());
         ExchangeRatesCache cache = new ExchangeRatesCache(cacheId);
+
+        // Set execution date
+        cache.setExecDate(dto.getExecDate());
 
         // Convert rate DTOs to entities
         if (dto.getRates() != null) {

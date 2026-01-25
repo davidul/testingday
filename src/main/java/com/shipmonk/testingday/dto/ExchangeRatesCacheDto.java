@@ -2,17 +2,19 @@ package com.shipmonk.testingday.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * DTO representing cached exchange rates for a specific date and base currency
- * Contains the date, base currency, and a list of exchange rate values
+ * Contains the date, base currency, execution timestamp, and a list of exchange rate values
  */
 public class ExchangeRatesCacheDto {
 
     private LocalDate date;
     private String baseCurrency;
+    private LocalDateTime execDate;
     private List<ExchangeRateValueDto> rates;
 
     public ExchangeRatesCacheDto() {
@@ -45,6 +47,14 @@ public class ExchangeRatesCacheDto {
 
     public void setBaseCurrency(String baseCurrency) {
         this.baseCurrency = baseCurrency;
+    }
+
+    public LocalDateTime getExecDate() {
+        return execDate;
+    }
+
+    public void setExecDate(LocalDateTime execDate) {
+        this.execDate = execDate;
     }
 
     public List<ExchangeRateValueDto> getRates() {

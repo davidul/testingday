@@ -1,6 +1,7 @@
 package com.shipmonk.testingday.entity;
 
 import javax.persistence.*;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -10,6 +11,9 @@ public class ExchangeRatesCache {
 
     @EmbeddedId
     private ExchangeRatesCacheId id;
+
+    @Column(name = "exec_date")
+    private LocalDateTime execDate;
 
     @OneToMany(mappedBy = "exchangeRatesCache", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<ExchangeRateValue> exchangeRateValues = new HashSet<>();
@@ -27,6 +31,14 @@ public class ExchangeRatesCache {
 
     public void setId(ExchangeRatesCacheId id) {
         this.id = id;
+    }
+
+    public LocalDateTime getExecDate() {
+        return execDate;
+    }
+
+    public void setExecDate(LocalDateTime execDate) {
+        this.execDate = execDate;
     }
 
     public Set<ExchangeRateValue> getExchangeRateValues() {

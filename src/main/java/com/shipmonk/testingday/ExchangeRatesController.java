@@ -1,9 +1,8 @@
 package com.shipmonk.testingday;
 
 import com.shipmonk.testingday.dto.ExchangeRatesCacheDto;
-import com.shipmonk.testingday.dto.ExchangeRatesCacheMapper;
-import com.shipmonk.testingday.entity.ExchangeRatesCache;
 import com.shipmonk.testingday.exception.CachedRatesNotFoundException;
+import com.shipmonk.testingday.exception.InvalidInputException;
 import com.shipmonk.testingday.external.FixerResponse;
 import com.shipmonk.testingday.mapper.FixerResponseMapper;
 import com.shipmonk.testingday.service.CachedExchangeRatesService;
@@ -42,6 +41,17 @@ public class ExchangeRatesController {
                                    CachedExchangeRatesService cachedService) {
         this.apiService = apiService;
         this.cachedService = cachedService;
+    }
+
+    /**
+     * Respond for empty/missing date, otherwise 400 not-found <br/>
+     * Example: GET /api/v1/rates <br/>
+     * This endpoint does not return any data, it only validates the date format
+     */
+    @RequestMapping(method = RequestMethod.GET,
+        produces = "application/json")
+    public void fixerResponseController() {
+        validateDateFormat(null);
     }
 
     /**
@@ -115,9 +125,9 @@ public class ExchangeRatesController {
     private void validateDateFormat(String date) {
         if (date == null || date.trim().isEmpty()) {
             logger.error("Date parameter is null or empty");
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Date parameter is required"
+            throw new InvalidInputException(
+                "Date parameter is required",
+                "Date parameter cannot be empty"
             );
         }
 
@@ -126,8 +136,8 @@ public class ExchangeRatesController {
             logger.debug("Date format validation passed for: {}", date);
         } catch (DateTimeParseException e) {
             logger.error("Invalid date format provided: {}. Expected format: YYYY-MM-DD", date);
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
+            throw new InvalidInputException(
+                "INVALID_DATE_FORMAT",
                 String.format("Invalid date format: '%s'. Expected format: YYYY-MM-DD (e.g., 2013-12-24)", date)
             );
         }

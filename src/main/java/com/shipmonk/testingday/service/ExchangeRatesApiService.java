@@ -1,6 +1,7 @@
 package com.shipmonk.testingday.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shipmonk.testingday.exception.InvalidInputException;
 import com.shipmonk.testingday.external.FixerErrorResponse;
 import com.shipmonk.testingday.external.FixerResponse;
 import org.slf4j.Logger;
@@ -120,14 +121,23 @@ public class ExchangeRatesApiService {
      *
      * @param date   The date string to validate
      * @param apiKey The API key to validate
-     * @throws IllegalArgumentException if inputs are invalid
+     * @throws InvalidInputException if inputs are invalid
      */
     private void validateInputs(String date, String apiKey) {
+        // Validate date is not null or empty
         if (date == null || date.trim().isEmpty()) {
-            throw new IllegalArgumentException("Date cannot be null or empty");
+            throw new InvalidInputException(
+                "Date parameter is required",
+                "The 'date' parameter cannot be null or empty. Please provide a date in YYYY-MM-DD format."
+            );
         }
+
+        // Validate date format
         if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
-            throw new IllegalArgumentException("Invalid date format. Expected: YYYY-MM-DD, got: " + date);
+            throw new InvalidInputException(
+                "Invalid date format: " + date,
+                String.format("The date '%s' does not match the required format YYYY-MM-DD. Example: 2024-01-15", date)
+            );
         }
 
         // Validate that the date is actually valid (e.g., not 2024-13-01 or 2024-01-32)
@@ -139,8 +149,9 @@ public class ExchangeRatesApiService {
 
             // Check month is valid (1-12)
             if (month < 1 || month > 12) {
-                throw new IllegalArgumentException(
-                    String.format("Invalid month: %d. Month must be between 1 and 12. Date: %s", month, date)
+                throw new InvalidInputException(
+                    "Invalid month: " + month,
+                    String.format("The month value '%d' in date '%s' is invalid. Month must be between 1 and 12.", month, date)
                 );
             }
 
@@ -148,17 +159,25 @@ public class ExchangeRatesApiService {
             of(year, month, day); // This validates the actual date
 
         } catch (java.time.DateTimeException e) {
-            throw new IllegalArgumentException(
-                String.format("Invalid date: %s. %s", date, e.getMessage()), e
+            throw new InvalidInputException(
+                "Invalid date: " + date,
+                String.format("The date '%s' is not valid. %s", date, e.getMessage()),
+                e
             );
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                String.format("Invalid date format: %s. Could not parse date components.", date), e
+            throw new InvalidInputException(
+                "Invalid date format: " + date,
+                String.format("The date '%s' contains non-numeric values. Expected format: YYYY-MM-DD with numeric values.", date),
+                e
             );
         }
 
+        // Validate API key
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            throw new IllegalArgumentException("API key cannot be null or empty");
+            throw new InvalidInputException(
+                "API key is required",
+                "The 'apiKey' parameter cannot be null or empty. Please provide a valid Fixer.io API key."
+            );
         }
     }
 

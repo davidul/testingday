@@ -98,6 +98,9 @@ schema-down:
 build:
 	mvn clean package
 
+build-skip-tests:
+	mvn clean package -DskipTests
+
 # Run with default profile (dev)
 run:
 	java -jar target/testingday-exchange-rates-0.0.1-SNAPSHOT.jar
