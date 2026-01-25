@@ -1,4 +1,4 @@
-package com.shipmonk.testingday;
+package com.shipmonk.testingday.controller;
 
 import com.shipmonk.testingday.dto.ExchangeRatesCacheDto;
 import com.shipmonk.testingday.exception.CachedRatesNotFoundException;
