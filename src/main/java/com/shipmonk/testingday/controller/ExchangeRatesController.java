@@ -54,7 +54,7 @@ public class ExchangeRatesController {
      * Example: GET /api/v1/rates/2013-12-24?symbols=USD,GBP,EUR <br/>
      * This endpoint uses asynchronous API calls to Fixer.io
      *
-     * @param day The date in YYYY-MM-DD format
+     * @param day     The date in YYYY-MM-DD format
      * @param symbols Comma-separated list of currency symbols (e.g., "USD,GBP,EUR"). Optional, defaults to "EUR,GBP,CAD"
      * @return Exchange rates response
      */
@@ -62,10 +62,10 @@ public class ExchangeRatesController {
         path = "/{day}",
         produces = "application/json")
     public FixerResponse getRates(
-            @PathVariable String day,
-            @RequestParam(name = "symbols", required = false, defaultValue = DEFAULT_SYMBOLS) String symbols,
-            @RequestParam(name = "access_key") String apiKey,
-            @RequestParam(name = "base", required = false, defaultValue = DEFAULT_BASE_CURRENCY) String baseCurrency){
+        @PathVariable String day,
+        @RequestParam(name = "symbols", required = false, defaultValue = DEFAULT_SYMBOLS) String symbols,
+        @RequestParam(name = "access_key") String apiKey,
+        @RequestParam(name = "base", required = false, defaultValue = DEFAULT_BASE_CURRENCY) String baseCurrency) {
         logger.info("Received request for exchange rates on day: {} with symbols: {}", day, symbols);
 
         // Validate date format
@@ -83,15 +83,12 @@ public class ExchangeRatesController {
             ExchangeRatesCacheDto cachedRates = cachedService.getCachedRates(date, baseCurrency);
             logger.info("Returning cached rates for date: {} and base currency: {}", day, baseCurrency);
 
+            symbols = compareSymbols(symbols, cachedRates);
+            // fetch only if there are missing symbols
+            if (!symbols.isEmpty()) {
                 logger.info("Cached rates do not contain all requested symbols. Fetching missing symbols from Fixer.io...");
-                CompletableFuture<FixerResponse> fixerResponseCompletableFuture =
-                    apiService.fetchExchangeRatesAsync(day, baseCurrency, symbols, apiKey);
-
-                symbols = compareSymbols(symbols, cachedRates);
-                // fetch only if there are missing symbols
-                if(!symbols.isEmpty()){
-                    fetchFixerExchangeRates(day, symbols, apiKey, date);
-                }
+                fetchFixerExchangeRates(day, symbols, apiKey, date);
+            }
 
             return FixerResponseMapper.toFixerResponse(cachedRates);
 
@@ -103,6 +100,7 @@ public class ExchangeRatesController {
     }
 
     private FixerResponse fetchFixerExchangeRates(String day, String symbols, String apiKey, LocalDate date) {
+
         CompletableFuture<FixerResponse> fixerResponseCompletableFuture =
             apiService.fetchExchangeRatesAsync(day, DEFAULT_BASE_CURRENCY, symbols, apiKey);
 
@@ -131,14 +129,14 @@ public class ExchangeRatesController {
     private String compareSymbols(String symbols, ExchangeRatesCacheDto cachedRates) {
         List<ExchangeRateValueDto> rates = cachedRates.getRates();
         List<String> symbolParams = new ArrayList<>(List.of(symbols.split(",")));
-        if(symbolParams.isEmpty()){
-            return symbolParams;
+        if (symbolParams.isEmpty()) {
+            return "";
         }
         List<String> cachedCurrencies = rates.stream()
             .map(ExchangeRateValueDto::getTargetCurrency)
             .toList();
         symbolParams.removeAll(cachedCurrencies);
-        if(symbolParams.isEmpty()){
+        if (symbolParams.isEmpty()) {
             return "";
         }
         return String.join(",", symbolParams);
