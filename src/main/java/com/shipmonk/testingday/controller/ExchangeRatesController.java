@@ -74,6 +74,7 @@ public class ExchangeRatesController {
         // Validate symbols parameter
         validateSymbols(symbols);
 
+        // Validate API key
         validateInputs(apiKey);
 
         LocalDate date = LocalDate.parse(day, DATE_FORMATTER);
@@ -82,74 +83,65 @@ public class ExchangeRatesController {
             ExchangeRatesCacheDto cachedRates = cachedService.getCachedRates(date, baseCurrency);
             logger.info("Returning cached rates for date: {} and base currency: {}", day, baseCurrency);
 
-            if(symbols != null && compareSymbols(symbols, cachedRates)){
                 logger.info("Cached rates do not contain all requested symbols. Fetching missing symbols from Fixer.io...");
                 CompletableFuture<FixerResponse> fixerResponseCompletableFuture =
                     apiService.fetchExchangeRatesAsync(day, baseCurrency, symbols, apiKey);
 
-                try {
-                    // Wait for the CompletableFuture to complete and get the result
-                    FixerResponse fixerResponse = fixerResponseCompletableFuture.join();
-
-                    logger.info("Successfully fetched missing rates from Fixer.io for date: {}", day);
-                    logger.debug("Fixer.io response: {}", fixerResponse);
-
-                    ExchangeRatesCacheDto dto = FixerResponseMapper.toDto(fixerResponse);
-                    cachedService.saveToCache(date, baseCurrency, dto);
-
-                    return fixerResponse;
-
-                } catch (Exception ex) {
-                    logger.error("Error fetching rates from Fixer.io for date: {}", day, ex);
-                    throw new ResponseStatusException(
-                        HttpStatus.BAD_GATEWAY,
-                        String.format("Failed to fetch exchange rates for date: %s. Error: %s", day, ex.getMessage()),
-                        ex
-                    );
+                symbols = compareSymbols(symbols, cachedRates);
+                // fetch only if there are missing symbols
+                if(!symbols.isEmpty()){
+                    fetchFixerExchangeRates(day, symbols, apiKey, date);
                 }
-            }
+
             return FixerResponseMapper.toFixerResponse(cachedRates);
 
         } catch (CachedRatesNotFoundException e) {
             logger.info("Cache miss for date: {} and base currency: {}. Fetching from Fixer.io...", day, DEFAULT_BASE_CURRENCY);
 
-            CompletableFuture<FixerResponse> fixerResponseCompletableFuture =
-                apiService.fetchExchangeRatesAsync(day, DEFAULT_BASE_CURRENCY, symbols, apiKey);
-
-            try {
-                // Wait for the CompletableFuture to complete and get the result
-                FixerResponse fixerResponse = fixerResponseCompletableFuture.join();
-
-                logger.info("Successfully fetched rates from Fixer.io for date: {}", day);
-                logger.debug("Fixer.io response: {}", fixerResponse);
-
-                ExchangeRatesCacheDto dto = FixerResponseMapper.toDto(fixerResponse);
-                cachedService.saveToCache(date, DEFAULT_BASE_CURRENCY, dto);
-
-                return fixerResponse;
-
-            } catch (Exception ex) {
-                logger.error("Error fetching rates from Fixer.io for date: {}", day, ex);
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    String.format("Failed to fetch exchange rates for date: %s. Error: %s", day, ex.getMessage()),
-                    ex
-                );
-            }
+            return fetchFixerExchangeRates(day, symbols, apiKey, date);
         }
     }
 
-    private boolean compareSymbols(String symbols, ExchangeRatesCacheDto cachedRates) {
+    private FixerResponse fetchFixerExchangeRates(String day, String symbols, String apiKey, LocalDate date) {
+        CompletableFuture<FixerResponse> fixerResponseCompletableFuture =
+            apiService.fetchExchangeRatesAsync(day, DEFAULT_BASE_CURRENCY, symbols, apiKey);
+
+        try {
+            // Wait for the CompletableFuture to complete and get the result
+            FixerResponse fixerResponse = fixerResponseCompletableFuture.join();
+
+            logger.info("Successfully fetched rates from Fixer.io for date: {}", day);
+            logger.debug("Fixer.io response: {}", fixerResponse);
+
+            ExchangeRatesCacheDto dto = FixerResponseMapper.toDto(fixerResponse);
+            cachedService.saveToCache(date, DEFAULT_BASE_CURRENCY, dto);
+
+            return fixerResponse;
+
+        } catch (Exception ex) {
+            logger.error("Error fetching rates from Fixer.io for date: {}", day, ex);
+            throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                String.format("Failed to fetch exchange rates for date: %s. Error: %s", day, ex.getMessage()),
+                ex
+            );
+        }
+    }
+
+    private String compareSymbols(String symbols, ExchangeRatesCacheDto cachedRates) {
         List<ExchangeRateValueDto> rates = cachedRates.getRates();
         List<String> symbolParams = new ArrayList<>(List.of(symbols.split(",")));
         if(symbolParams.isEmpty()){
-            return false;
+            return symbolParams;
         }
         List<String> cachedCurrencies = rates.stream()
             .map(ExchangeRateValueDto::getTargetCurrency)
             .toList();
         symbolParams.removeAll(cachedCurrencies);
-        return symbolParams.size() > 0;
+        if(symbolParams.isEmpty()){
+            return "";
+        }
+        return String.join(",", symbolParams);
     }
 
 }
