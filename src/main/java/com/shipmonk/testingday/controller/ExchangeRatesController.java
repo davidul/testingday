@@ -22,6 +22,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.concurrent.CompletableFuture;
 
+import static com.shipmonk.testingday.validators.ApiKeyValidator.validateInputs;
+import static com.shipmonk.testingday.validators.DateValidator.validateDateFormat;
+
 @RestController
 @RequestMapping(
     path = "/api/v1/rates"
@@ -41,17 +44,6 @@ public class ExchangeRatesController {
                                    CachedExchangeRatesService cachedService) {
         this.apiService = apiService;
         this.cachedService = cachedService;
-    }
-
-    /**
-     * Respond for empty/missing date, otherwise 400 not-found <br/>
-     * Example: GET /api/v1/rates <br/>
-     * This endpoint does not return any data, it only validates the date format
-     */
-    @RequestMapping(method = RequestMethod.GET,
-        produces = "application/json")
-    public void fixerResponseController() {
-        validateDateFormat(null);
     }
 
     /**
@@ -78,6 +70,8 @@ public class ExchangeRatesController {
 
         // Validate symbols parameter
         validateSymbols(symbols);
+
+        validateInputs(day, apiKey);
 
         LocalDate date = LocalDate.parse(day, DATE_FORMATTER);
 
@@ -116,32 +110,6 @@ public class ExchangeRatesController {
         }
     }
 
-    /**
-     * Validates that the date string follows the YYYY-MM-DD pattern
-     *
-     * @param date The date string to validate
-     * @throws ResponseStatusException if the date format is invalid
-     */
-    private void validateDateFormat(String date) {
-        if (date == null || date.trim().isEmpty()) {
-            logger.error("Date parameter is null or empty");
-            throw new InvalidInputException(
-                "Date parameter is required",
-                "Date parameter cannot be empty"
-            );
-        }
-
-        try {
-            LocalDate.parse(date, DATE_FORMATTER);
-            logger.debug("Date format validation passed for: {}", date);
-        } catch (DateTimeParseException e) {
-            logger.error("Invalid date format provided: {}. Expected format: YYYY-MM-DD", date);
-            throw new InvalidInputException(
-                "INVALID_DATE_FORMAT",
-                String.format("Invalid date format: '%s'. Expected format: YYYY-MM-DD (e.g., 2013-12-24)", date)
-            );
-        }
-    }
 
     /**
      * Validates the symbols parameter format
@@ -185,5 +153,7 @@ public class ExchangeRatesController {
 
         logger.debug("Symbols validation passed for: {}", symbols);
     }
+
+
 
 }

@@ -1,6 +1,7 @@
 package com.shipmonk.testingday.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shipmonk.testingday.exception.InvalidInputException;
 import com.shipmonk.testingday.external.FixerErrorResponse;
 import com.shipmonk.testingday.external.FixerResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,8 +112,8 @@ class ExchangeRatesApiServiceTest {
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             null, testBaseCurrency, testSymbols, testApiKey
         ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Date cannot be null or empty");
+            .isInstanceOf(InvalidInputException.class)
+            .hasMessageContaining("Date parameter is required");
     }
 
     @Test
@@ -121,8 +122,8 @@ class ExchangeRatesApiServiceTest {
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "", testBaseCurrency, testSymbols, testApiKey
         ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Date cannot be null or empty");
+            .isInstanceOf(InvalidInputException.class)
+            .hasMessageContaining("Date parameter is required");
     }
 
     @Test
@@ -131,7 +132,7 @@ class ExchangeRatesApiServiceTest {
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "2024/01/15", testBaseCurrency, testSymbols, testApiKey
         ))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid date format");
     }
 
@@ -141,8 +142,8 @@ class ExchangeRatesApiServiceTest {
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             testDate, testBaseCurrency, testSymbols, null
         ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("API key cannot be null or empty");
+            .isInstanceOf(InvalidInputException.class)
+            .hasMessageContaining("API key is required");
     }
 
     @Test
@@ -151,8 +152,8 @@ class ExchangeRatesApiServiceTest {
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             testDate, testBaseCurrency, testSymbols, "   "
         ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("API key cannot be null or empty");
+            .isInstanceOf(InvalidInputException.class)
+            .hasMessageContaining("API key is required");
     }
 
     // ==================== Error Handling Tests ====================
@@ -427,11 +428,6 @@ class ExchangeRatesApiServiceTest {
             "24-01-01",      // Two-digit year
             "2024/01/01",    // Wrong separator
             "01-01-2024",    // Wrong order
-            "2024-13-01",    // Invalid month
-            "2024-01-32",    // Invalid day
-            "2024-02-30",    // Invalid day for February
-            "2024-04-31",    // Invalid day for April (only has 30 days)
-            "2023-02-29",    // Invalid leap year date (2023 is not a leap year)
             "not-a-date"     // Not a date
         };
 
@@ -440,8 +436,8 @@ class ExchangeRatesApiServiceTest {
             assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
                 invalidDate, testBaseCurrency, testSymbols, testApiKey
             ))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid date");
+                .isInstanceOf(InvalidInputException.class)
+                .hasMessageContaining("Invalid date format");
         }
     }
 
@@ -451,7 +447,7 @@ class ExchangeRatesApiServiceTest {
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "2024-13-01", testBaseCurrency, testSymbols, testApiKey
         ))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid month: 13");
     }
 
@@ -461,7 +457,7 @@ class ExchangeRatesApiServiceTest {
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "2024-01-32", testBaseCurrency, testSymbols, testApiKey
         ))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid date: 2024-01-32");
     }
 
@@ -488,7 +484,7 @@ class ExchangeRatesApiServiceTest {
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "2023-02-29", testBaseCurrency, testSymbols, testApiKey
         ))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid date: 2023-02-29");
     }
 

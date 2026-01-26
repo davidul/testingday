@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shipmonk.testingday.exception.InvalidInputException;
 import com.shipmonk.testingday.external.FixerErrorResponse;
 import com.shipmonk.testingday.external.FixerResponse;
+import com.shipmonk.testingday.validators.ApiKeyValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.shipmonk.testingday.validators.ApiKeyValidator.*;
+import static com.shipmonk.testingday.validators.DateValidator.validateDateFormat;
 import static java.time.LocalDate.of;
 
 @Service
@@ -84,7 +87,8 @@ public class ExchangeRatesApiService {
         logger.info("Fetching exchange rates for date: {} and base currency: {} on thread: {}",
             date, baseCurrency, Thread.currentThread().getName());
 
-        // Validate inputs
+        validateDateFormat(date);
+
         validateInputs(date, apiKey);
 
         if (freeModeSet.contains(apiKey)) {
@@ -113,71 +117,6 @@ public class ExchangeRatesApiService {
         } catch (Exception e) {
             logger.error("Error fetching exchange rates from Fixer.io for date: {}", date, e);
             return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    /**
-     * Validates input parameters
-     *
-     * @param date   The date string to validate
-     * @param apiKey The API key to validate
-     * @throws InvalidInputException if inputs are invalid
-     */
-    private void validateInputs(String date, String apiKey) {
-        // Validate date is not null or empty
-        if (date == null || date.trim().isEmpty()) {
-            throw new InvalidInputException(
-                "Date parameter is required",
-                "The 'date' parameter cannot be null or empty. Please provide a date in YYYY-MM-DD format."
-            );
-        }
-
-        // Validate date format
-        if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
-            throw new InvalidInputException(
-                "Invalid date format: " + date,
-                String.format("The date '%s' does not match the required format YYYY-MM-DD. Example: 2024-01-15", date)
-            );
-        }
-
-        // Validate that the date is actually valid (e.g., not 2024-13-01 or 2024-01-32)
-        try {
-            String[] parts = date.split("-");
-            int year = Integer.parseInt(parts[0]);
-            int month = Integer.parseInt(parts[1]);
-            int day = Integer.parseInt(parts[2]);
-
-            // Check month is valid (1-12)
-            if (month < 1 || month > 12) {
-                throw new InvalidInputException(
-                    "Invalid month: " + month,
-                    String.format("The month value '%d' in date '%s' is invalid. Month must be between 1 and 12.", month, date)
-                );
-            }
-
-            // Check day is valid for the given month and year
-            of(year, month, day); // This validates the actual date
-
-        } catch (java.time.DateTimeException e) {
-            throw new InvalidInputException(
-                "Invalid date: " + date,
-                String.format("The date '%s' is not valid. %s", date, e.getMessage()),
-                e
-            );
-        } catch (NumberFormatException e) {
-            throw new InvalidInputException(
-                "Invalid date format: " + date,
-                String.format("The date '%s' contains non-numeric values. Expected format: YYYY-MM-DD with numeric values.", date),
-                e
-            );
-        }
-
-        // Validate API key
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            throw new InvalidInputException(
-                "API key is required",
-                "The 'apiKey' parameter cannot be null or empty. Please provide a valid Fixer.io API key."
-            );
         }
     }
 

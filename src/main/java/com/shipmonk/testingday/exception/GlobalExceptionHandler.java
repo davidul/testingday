@@ -4,9 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * Global exception handler for the application
@@ -77,6 +79,76 @@ public class GlobalExceptionHandler {
             "INVALID_ARGUMENT",
             ex.getMessage(),
             "The provided argument is invalid or malformed",
+            request.getDescription(false).replace("uri=", "")
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Handle MissingServletRequestParameterException
+     * Thrown when a required @RequestParam is missing (e.g., access_key)
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException ex,
+            WebRequest request) {
+
+        logger.warn("Missing required parameter: {} of type {}", ex.getParameterName(), ex.getParameterType());
+
+        String parameterName = ex.getParameterName();
+        String message;
+        String description;
+
+        // Customize message based on parameter name
+        if ("access_key".equals(parameterName)) {
+            message = "API key is required";
+            description = "The 'access_key' query parameter is required. Please provide a valid Fixer.io API key. " +
+                         "Example: /api/v1/rates/2024-01-15?access_key=YOUR_API_KEY";
+        } else {
+            message = "Required parameter '" + parameterName + "' is missing";
+            description = String.format("The required query parameter '%s' of type '%s' is not present in the request.",
+                                       parameterName, ex.getParameterType());
+        }
+
+        ErrorResponse errorResponse = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            "MISSING_PARAMETER",
+            message,
+            description,
+            request.getDescription(false).replace("uri=", "")
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Handle MethodArgumentTypeMismatchException
+     * Thrown when a request parameter cannot be converted to the expected type
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            WebRequest request) {
+
+        logger.warn("Type mismatch for parameter: {} - expected type: {}, provided value: {}",
+                   ex.getName(), ex.getRequiredType(), ex.getValue());
+
+        String message = String.format("Invalid value for parameter '%s'", ex.getName());
+        String description = String.format(
+            "The parameter '%s' expects a value of type '%s', but received '%s'",
+            ex.getName(),
+            ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown",
+            ex.getValue()
+        );
+
+        ErrorResponse errorResponse = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            "INVALID_PARAMETER_TYPE",
+            message,
+            description,
             request.getDescription(false).replace("uri=", "")
         );
 

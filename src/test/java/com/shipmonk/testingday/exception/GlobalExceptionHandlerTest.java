@@ -28,9 +28,8 @@ class GlobalExceptionHandlerTest {
     @Test
     void testInvalidDateFormat_ReturnsErrorResponse() throws Exception {
         // When - Call endpoint with invalid date format
-        MvcResult result = mockMvc.perform(get("/api/exchange-rates")
-                .param("date", "2024/01/15") // Wrong format
-                .param("apiKey", "test-key"))
+        MvcResult result = mockMvc.perform(get("/api/v1/rates/2024%2F01%2F15")
+                .param("access_key", "test-key"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.status").value(400))
             .andExpect(jsonPath("$.error").value("Bad Request"))
@@ -50,11 +49,37 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void testMissingAccessKey_ReturnsCustomErrorMessage() throws Exception {
+        // When - Call endpoint without access_key parameter
+        MvcResult result = mockMvc.perform(get("/api/v1/rates/2024-01-15"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.error").value("Bad Request"))
+            .andExpect(jsonPath("$.errorCode").value("MISSING_PARAMETER"))
+            .andExpect(jsonPath("$.message").value("API key is required"))
+            .andExpect(jsonPath("$.description").exists())
+            .andExpect(jsonPath("$.timestamp").exists())
+            .andExpect(jsonPath("$.path").exists())
+            .andReturn();
+
+        // Verify response structure and content
+        String responseBody = result.getResponse().getContentAsString();
+        ErrorResponse errorResponse = objectMapper.readValue(responseBody, ErrorResponse.class);
+
+        assertThat(errorResponse.getStatus()).isEqualTo(400);
+        assertThat(errorResponse.getErrorCode()).isEqualTo("MISSING_PARAMETER");
+        assertThat(errorResponse.getMessage()).isEqualTo("API key is required");
+        assertThat(errorResponse.getDescription())
+            .contains("access_key")
+            .contains("required")
+            .contains("Example:");
+    }
+
+    @Test
     void testInvalidMonth_ReturnsErrorResponse() throws Exception {
         // When - Call endpoint with invalid month
-        MvcResult result = mockMvc.perform(get("/api/exchange-rates")
-                .param("date", "2024-13-01") // Invalid month
-                .param("apiKey", "test-key"))
+        MvcResult result = mockMvc.perform(get("/api/v1/rates/2024-13-01")
+                .param("access_key", "test-key"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.status").value(400))
             .andExpect(jsonPath("$.errorCode").value("INVALID_INPUT"))
@@ -70,9 +95,8 @@ class GlobalExceptionHandlerTest {
     @Test
     void testInvalidDay_ReturnsErrorResponse() throws Exception {
         // When - Call endpoint with invalid day
-        mockMvc.perform(get("/api/exchange-rates")
-                .param("date", "2024-01-32") // Invalid day
-                .param("apiKey", "test-key"))
+        mockMvc.perform(get("/api/v1/rates/2024-01-32")
+                .param("access_key", "test-key"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.status").value(400))
             .andExpect(jsonPath("$.errorCode").value("INVALID_INPUT"))
@@ -82,22 +106,8 @@ class GlobalExceptionHandlerTest {
     @Test
     void testMissingDate_ReturnsErrorResponse() throws Exception {
         // When - Call endpoint without date parameter
-        mockMvc.perform(get("/api/exchange-rates")
-                .param("apiKey", "test-key"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.errorCode").value("INVALID_INPUT"))
-            .andExpect(jsonPath("$.message").value("Date parameter is required"));
-    }
-
-    @Test
-    void testMissingApiKey_ReturnsErrorResponse() throws Exception {
-        // When - Call endpoint without API key
-        mockMvc.perform(get("/api/exchange-rates")
-                .param("date", "2024-01-15"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.errorCode").value("INVALID_INPUT"))
-            .andExpect(jsonPath("$.message").value("API key is required"));
+        mockMvc.perform(get("/api/v1/rates")
+                .param("access_key", "test-key"))
+            .andExpect(status().isNotFound());
     }
 }
