@@ -2,7 +2,6 @@ package com.shipmonk.testingday.controller;
 
 import com.shipmonk.testingday.dto.ExchangeRatesCacheDto;
 import com.shipmonk.testingday.exception.CachedRatesNotFoundException;
-import com.shipmonk.testingday.exception.InvalidInputException;
 import com.shipmonk.testingday.external.FixerResponse;
 import com.shipmonk.testingday.mapper.FixerResponseMapper;
 import com.shipmonk.testingday.service.CachedExchangeRatesService;
@@ -19,11 +18,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.shipmonk.testingday.validators.ApiKeyValidator.validateInputs;
 import static com.shipmonk.testingday.validators.DateValidator.validateDateFormat;
+import static com.shipmonk.testingday.validators.SymbolValidator.validateSymbols;
 
 @RestController
 @RequestMapping(
@@ -34,7 +33,8 @@ public class ExchangeRatesController {
     private static final Logger logger = LoggerFactory.getLogger(ExchangeRatesController.class);
     private static final String DEFAULT_BASE_CURRENCY = "EUR";
     private static final String DEFAULT_SYMBOLS = "USD,GBP,CAD";
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    public static final String DATE_FORMAT = "yyyy-MM-dd";
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT);
 
     private final ExchangeRatesApiService apiService;
 
@@ -71,7 +71,7 @@ public class ExchangeRatesController {
         // Validate symbols parameter
         validateSymbols(symbols);
 
-        validateInputs(day, apiKey);
+        validateInputs(apiKey);
 
         LocalDate date = LocalDate.parse(day, DATE_FORMATTER);
 
@@ -109,51 +109,5 @@ public class ExchangeRatesController {
             }
         }
     }
-
-
-    /**
-     * Validates the symbols parameter format
-     * Symbols should be comma-separated, 3-letter uppercase currency codes
-     *
-     * @param symbols The symbols string to validate
-     * @throws ResponseStatusException if the symbols format is invalid
-     */
-    private void validateSymbols(String symbols) {
-        if (symbols == null || symbols.trim().isEmpty()) {
-            logger.error("Symbols parameter is null or empty");
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Symbols parameter cannot be empty"
-            );
-        }
-
-        // Split by comma and validate each symbol
-        String[] symbolArray = symbols.split(",");
-
-        for (String symbol : symbolArray) {
-            String trimmedSymbol = symbol.trim();
-
-            if (trimmedSymbol.isEmpty()) {
-                logger.error("Empty symbol found in symbols parameter: {}", symbols);
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Symbols parameter contains empty values"
-                );
-            }
-
-            // Validate that symbol is 3 letters and uppercase
-            if (!trimmedSymbol.matches("^[A-Z]{3}$")) {
-                logger.error("Invalid symbol format: {}. Expected 3 uppercase letters", trimmedSymbol);
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    String.format("Invalid currency symbol: '%s'. Expected 3 uppercase letters (e.g., USD, EUR, GBP)", trimmedSymbol)
-                );
-            }
-        }
-
-        logger.debug("Symbols validation passed for: {}", symbols);
-    }
-
-
 
 }

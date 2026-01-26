@@ -89,7 +89,7 @@ public class ExchangeRatesApiService {
 
         validateDateFormat(date);
 
-        validateInputs(date, apiKey);
+        validateInputs(apiKey);
 
         if (freeModeSet.contains(apiKey)) {
             return fetchExchangeRatesFreePlanWithRetry(date, apiKey, 0);
