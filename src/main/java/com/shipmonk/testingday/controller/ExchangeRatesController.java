@@ -1,5 +1,6 @@
 package com.shipmonk.testingday.controller;
 
+import com.shipmonk.testingday.dto.ExchangeRateValueDto;
 import com.shipmonk.testingday.dto.ExchangeRatesCacheDto;
 import com.shipmonk.testingday.exception.CachedRatesNotFoundException;
 import com.shipmonk.testingday.external.FixerResponse;
@@ -18,6 +19,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static com.shipmonk.testingday.validators.ApiKeyValidator.validateInputs;
@@ -79,6 +82,32 @@ public class ExchangeRatesController {
             ExchangeRatesCacheDto cachedRates = cachedService.getCachedRates(date, baseCurrency);
             logger.info("Returning cached rates for date: {} and base currency: {}", day, baseCurrency);
 
+            if(symbols != null && compareSymbols(symbols, cachedRates)){
+                logger.info("Cached rates do not contain all requested symbols. Fetching missing symbols from Fixer.io...");
+                CompletableFuture<FixerResponse> fixerResponseCompletableFuture =
+                    apiService.fetchExchangeRatesAsync(day, baseCurrency, symbols, apiKey);
+
+                try {
+                    // Wait for the CompletableFuture to complete and get the result
+                    FixerResponse fixerResponse = fixerResponseCompletableFuture.join();
+
+                    logger.info("Successfully fetched missing rates from Fixer.io for date: {}", day);
+                    logger.debug("Fixer.io response: {}", fixerResponse);
+
+                    ExchangeRatesCacheDto dto = FixerResponseMapper.toDto(fixerResponse);
+                    cachedService.saveToCache(date, baseCurrency, dto);
+
+                    return fixerResponse;
+
+                } catch (Exception ex) {
+                    logger.error("Error fetching rates from Fixer.io for date: {}", day, ex);
+                    throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        String.format("Failed to fetch exchange rates for date: %s. Error: %s", day, ex.getMessage()),
+                        ex
+                    );
+                }
+            }
             return FixerResponseMapper.toFixerResponse(cachedRates);
 
         } catch (CachedRatesNotFoundException e) {
@@ -108,6 +137,19 @@ public class ExchangeRatesController {
                 );
             }
         }
+    }
+
+    private boolean compareSymbols(String symbols, ExchangeRatesCacheDto cachedRates) {
+        List<ExchangeRateValueDto> rates = cachedRates.getRates();
+        List<String> symbolParams = new ArrayList<>(List.of(symbols.split(",")));
+        if(symbolParams.isEmpty()){
+            return false;
+        }
+        List<String> cachedCurrencies = rates.stream()
+            .map(ExchangeRateValueDto::getTargetCurrency)
+            .toList();
+        symbolParams.removeAll(cachedCurrencies);
+        return symbolParams.size() > 0;
     }
 
 }

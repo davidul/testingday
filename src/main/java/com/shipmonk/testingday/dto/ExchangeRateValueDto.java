@@ -1,6 +1,7 @@
 package com.shipmonk.testingday.dto;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 /**
  * DTO representing a single exchange rate value
@@ -33,5 +34,17 @@ public class ExchangeRateValueDto {
 
     public void setRate(BigDecimal rate) {
         this.rate = rate;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        ExchangeRateValueDto that = (ExchangeRateValueDto) o;
+        return Objects.equals(targetCurrency, that.targetCurrency) && Objects.equals(rate, that.rate);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(targetCurrency, rate);
     }
 }

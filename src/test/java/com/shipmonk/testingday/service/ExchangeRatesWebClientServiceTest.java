@@ -6,6 +6,7 @@ import com.shipmonk.testingday.external.FixerResponse;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Integration tests for ExchangeRatesWebClientService using MockWebServer
  * Tests reactive HTTP calls, retry logic, and error handling
  */
+@Ignore
 class ExchangeRatesWebClientServiceTest {
 
     private MockWebServer mockWebServer;

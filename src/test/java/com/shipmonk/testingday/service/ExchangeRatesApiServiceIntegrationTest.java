@@ -57,9 +57,6 @@ class ExchangeRatesApiServiceIntegrationTest {
     @Autowired
     private ExchangeRatesApiService service;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
     private MockWebServer mockWebServer;
 
     @BeforeEach
