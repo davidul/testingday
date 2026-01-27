@@ -12,6 +12,7 @@
 #
 # Application Build & Run:
 #   make build              - Build the application JAR
+#   make build-skip-tests   - Build the application JAR skipping tests
 #   make run                - Run with default profile (dev)
 #   make run-dev            - Run JAR with DEV profile
 #   make run-prod           - Run JAR with PROD profile
@@ -20,10 +21,20 @@
 #   make build-run-dev      - Build and run in DEV profile
 #   make build-run-prod     - Build and run in PROD profile
 #
+# Docker Commands:
+#   make docker-build       - Build Docker image
+#   make docker-run         - Run application in Docker container
+#   make docker-stop        - Stop Docker container
+#   make docker-logs        - View Docker container logs
+#   make docker-up          - Start all services with docker-compose
+#   make docker-down        - Stop all services with docker-compose
+#   make docker-restart     - Restart all services
+#   make docker-clean       - Remove all containers and images
+#
 # ========================================
 
 
-.PHONY: help postgres-up postgres-down postgres-ps postgres-clean schema-up schema-down build run run-dev run-prod dev prod build-run-dev build-run-prod
+.PHONY: help postgres-up postgres-down postgres-ps postgres-clean schema-up schema-down build run run-dev run-prod dev prod build-run-dev build-run-prod docker-build docker-run docker-stop docker-logs docker-up docker-down docker-restart docker-clean
 
 # Default target - show help when running 'make' without arguments
 .DEFAULT_GOAL := help
@@ -43,6 +54,7 @@ help:
 	@echo ""
 	@echo "Application Build & Run:"
 	@echo "  make build            - Build the application JAR"
+	@echo "  make build-skip-tests - Build the application JAR skipping tests"
 	@echo "  make run              - Run with default profile (dev)"
 	@echo "  make run-dev          - Run JAR with DEV profile"
 	@echo "  make run-prod         - Run JAR with PROD profile"
@@ -51,11 +63,26 @@ help:
 	@echo "  make build-run-dev    - Build and run in DEV profile"
 	@echo "  make build-run-prod   - Build and run in PROD profile"
 	@echo ""
-	@echo "Quick Start:"
+	@echo "Docker Commands:"
+	@echo "  make docker-build     - Build Docker image"
+	@echo "  make docker-run       - Run application in Docker container"
+	@echo "  make docker-stop      - Stop Docker container"
+	@echo "  make docker-logs      - View Docker container logs"
+	@echo "  make docker-up        - Start all services with docker-compose"
+	@echo "  make docker-down      - Stop all services with docker-compose"
+	@echo "  make docker-restart   - Restart all services"
+	@echo "  make docker-clean     - Remove all containers and images"
+	@echo ""
+	@echo "Quick Start (Local Development):"
 	@echo "  1. make postgres-up   - Start database"
 	@echo "  2. sleep 5            - Wait for PostgreSQL to initialize"
 	@echo "  3. make schema-up     - Apply schema"
 	@echo "  4. make dev           - Run application with hot reload"
+	@echo ""
+	@echo "Quick Start (Docker):"
+	@echo "  1. export FIXER_API_KEY=your_api_key"
+	@echo "  2. make docker-up     - Start all services (DB + App)"
+	@echo "  3. Visit http://localhost:8080/api/v1/rates/2024-01-15"
 	@echo ""
 	@echo "Production Deployment:"
 	@echo "  1. Set environment variables:"
@@ -127,3 +154,48 @@ build-run-dev: build run-dev
 # Build and run in PROD
 build-run-prod: build run-prod
 
+# ========================================
+# Docker Commands
+# ========================================
+
+# Build Docker image
+docker-build:
+	docker build -t exchange-rates-app:latest .
+
+# Run application in Docker (standalone)
+docker-run:
+	docker run -d \
+	  --name exchange-rates-app \
+	  -p 8080:8080 \
+	  -e SPRING_PROFILES_ACTIVE=prod \
+	  -e DATABASE_URL=${DATABASE_URL} \
+	  -e DATABASE_USERNAME=${DATABASE_USERNAME} \
+	  -e DATABASE_PASSWORD=${DATABASE_PASSWORD} \
+	  -e FIXER_API_KEY=${FIXER_API_KEY} \
+	  exchange-rates-app:latest
+
+# Stop Docker container
+docker-stop:
+	docker stop exchange-rates-app || true
+	docker rm exchange-rates-app || true
+
+# View Docker container logs
+docker-logs:
+	docker logs -f exchange-rates-app
+
+# Start all services with docker-compose
+docker-up:
+	docker compose up -d
+
+# Stop all services with docker-compose
+docker-down:
+	docker compose down
+
+# Restart all services
+docker-restart: docker-down docker-up
+
+# Clean up all containers, images, and volumes
+docker-clean:
+	docker compose down -v
+	docker rmi exchange-rates-app:latest || true
+	docker volume prune -f
