@@ -1,10 +1,8 @@
 package com.shipmonk.testingday.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shipmonk.testingday.exception.InvalidInputException;
 import com.shipmonk.testingday.external.FixerErrorResponse;
 import com.shipmonk.testingday.external.FixerResponse;
-import com.shipmonk.testingday.validators.ApiKeyValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static com.shipmonk.testingday.validators.ApiKeyValidator.*;
 import static com.shipmonk.testingday.validators.DateValidator.validateDateFormat;
-import static java.time.LocalDate.of;
 
 @Service
 public class ExchangeRatesApiService {
