@@ -3,6 +3,9 @@
 ## Table of Contents
 
 - [Requirements](#requirements)
+- [Quick Start](#quick-start)
+  - [Local Development](#local-development)
+  - [Docker Deployment](#docker-deployment)
 - [Schema](#schema)
   - [Database ER Diagram](#database-er-diagram)
   - [Tables Description](#tables-description)
@@ -107,7 +110,6 @@ docker-compose logs -f app
 docker-compose down
 ```
 
-📘 **For detailed Docker setup, see [DOCKER_SETUP.md](DOCKER_SETUP.md)**
 
 ## Schema
 
