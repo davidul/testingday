@@ -7,8 +7,6 @@
 #   make postgres-down      - Stop and remove PostgreSQL container
 #   make postgres-ps        - Check PostgreSQL container status
 #   make postgres-clean     - Remove PostgreSQL data volume
-#   make schema-up          - Apply database schema migration (up)
-#   make schema-down        - Rollback database schema migration (down)
 #
 # Application Build & Run:
 #   make build              - Build the application JAR
@@ -49,8 +47,6 @@ help:
 	@echo "  make postgres-down    - Stop and remove PostgreSQL container"
 	@echo "  make postgres-ps      - Check PostgreSQL container status"
 	@echo "  make postgres-clean   - Remove PostgreSQL data volume (WARNING: deletes all data)"
-	@echo "  make schema-up        - Apply database schema migration (up)"
-	@echo "  make schema-down      - Rollback database schema migration (down)"
 	@echo ""
 	@echo "Application Build & Run:"
 	@echo "  make build            - Build the application JAR"
@@ -94,6 +90,7 @@ help:
 	@echo ""
 	@echo "==========================================\n"
 
+# For local development PostgreSQL
 postgres-up:
 	docker run --name shipmonk-postgres \
 	  -e POSTGRES_USER=shipmonk \
@@ -112,15 +109,6 @@ postgres-ps:
 
 postgres-clean:
 	docker volume rm shipmonk_pgdata || true
-
-schema-up:
-	psql -h localhost -U shipmonk -d shipmonk-exchange-rate-db -f migrations/0001_init_schema.up.sql || \
-	docker exec -i shipmonk-postgres psql -U shipmonk -d shipmonk-exchange-rate-db < migrations/0001_init_schema.up.sql
-
-schema-down:
-	psql -h localhost -U shipmonk -d shipmonk-exchange-rate-db -f migrations/0001_init_schema.down.sql || \
-	docker exec -i shipmonk-postgres psql -U shipmonk -d shipmonk-exchange-rate-db < migrations/0001_init_schema.down.sql
-
 
 build:
 	mvn clean package

@@ -4,6 +4,7 @@ import com.shipmonk.testingday.entity.ExchangeRatesCache;
 import com.shipmonk.testingday.entity.ExchangeRatesCacheId;
 import com.shipmonk.testingday.entity.ExchangeRateValue;
 import com.shipmonk.testingday.entity.ExchangeRateValueId;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -14,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for ExchangeRatesCache DTO and Mapper
  */
+@Tag("unit")
 class ExchangeRatesCacheDtoTest {
 
     @Test

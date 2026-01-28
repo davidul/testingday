@@ -2,12 +2,14 @@ package com.shipmonk.testingday.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shipmonk.testingday.config.AsyncConfiguration;
+import com.shipmonk.testingday.exception.InvalidInputException;
 import com.shipmonk.testingday.external.FixerResponse;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(classes = {ExchangeRatesApiService.class})
 @Import({ExchangeRatesApiServiceIntegrationTest.TestConfig.class, AsyncConfiguration.class})
 @ActiveProfiles("test")
+@Tag("integration")
 class ExchangeRatesApiServiceIntegrationTest {
 
     /**
@@ -312,7 +315,7 @@ class ExchangeRatesApiServiceIntegrationTest {
             "EUR",
             "test-key"
         ))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid date format");
 
         // Verify no request was made
@@ -328,8 +331,8 @@ class ExchangeRatesApiServiceIntegrationTest {
             "EUR",
             null
         ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("API key cannot be null");
+            .isInstanceOf(InvalidInputException.class)
+            .hasMessageContaining("API key is required");
 
         // Verify no request was made
         assertThat(mockWebServer.getRequestCount()).isEqualTo(0);

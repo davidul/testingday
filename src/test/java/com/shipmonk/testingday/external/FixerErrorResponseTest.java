@@ -1,6 +1,7 @@
 package com.shipmonk.testingday.external;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -8,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for FixerErrorResponse parsing
  */
+@Tag("unit")
 class FixerErrorResponseTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();

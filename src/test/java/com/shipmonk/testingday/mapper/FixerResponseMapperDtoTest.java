@@ -4,6 +4,7 @@ import com.shipmonk.testingday.dto.ExchangeRatesCacheDto;
 import com.shipmonk.testingday.dto.ExchangeRateValueDto;
 import com.shipmonk.testingday.entity.ExchangeRatesCache;
 import com.shipmonk.testingday.external.FixerResponse;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Unit tests for FixerResponseMapper DTO conversion methods
  */
+@Tag("unit")
 class FixerResponseMapperDtoTest {
 
     @Test

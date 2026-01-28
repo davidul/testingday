@@ -5,6 +5,7 @@ import com.shipmonk.testingday.exception.InvalidInputException;
 import com.shipmonk.testingday.external.FixerErrorResponse;
 import com.shipmonk.testingday.external.FixerResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.*;
  * Tests async operations, retry logic, error handling, and API integration
  */
 @ExtendWith(MockitoExtension.class)
+@Tag("unit")
 class ExchangeRatesApiServiceTest {
 
     @Mock
