@@ -104,7 +104,6 @@ public class ExchangeRatesController {
         CompletableFuture<FixerResponse> fixerResponseCompletableFuture =
             apiService.fetchExchangeRatesAsync(day, DEFAULT_BASE_CURRENCY, symbols, apiKey);
 
-        try {
             // Wait for the CompletableFuture to complete and get the result
             FixerResponse fixerResponse = fixerResponseCompletableFuture.join();
 
@@ -115,15 +114,6 @@ public class ExchangeRatesController {
             cachedService.saveToCache(date, DEFAULT_BASE_CURRENCY, dto);
 
             return fixerResponse;
-
-        } catch (Exception ex) {
-            logger.error("Error fetching rates from Fixer.io for date: {}", day, ex);
-            throw new ResponseStatusException(
-                HttpStatus.BAD_GATEWAY,
-                String.format("Failed to fetch exchange rates for date: %s. Error: %s", day, ex.getMessage()),
-                ex
-            );
-        }
     }
 
     private String compareSymbols(String symbols, ExchangeRatesCacheDto cachedRates) {
