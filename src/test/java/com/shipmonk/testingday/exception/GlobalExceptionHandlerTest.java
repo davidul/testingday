@@ -112,4 +112,37 @@ class GlobalExceptionHandlerTest {
                 .param("access_key", "test-key"))
             .andExpect(status().isNotFound());
     }
+
+    @Test
+    void testInvalidSymbols_ReturnsErrorResponse() throws Exception {
+        // When - Call endpoint with invalid symbols (too short)
+        MvcResult result = mockMvc.perform(get("/api/v1/rates/2024-01-15")
+                .param("access_key", "test-key")
+                .param("symbols", "US,GB"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.error").value("Bad Request"))
+            .andExpect(jsonPath("$.message").exists())
+            .andExpect(jsonPath("$.description").exists())
+            .andReturn();
+
+        // Verify response structure
+        String responseBody = result.getResponse().getContentAsString();
+        ErrorResponse errorResponse = objectMapper.readValue(responseBody, ErrorResponse.class);
+
+        assertThat(errorResponse.getStatus()).isEqualTo(400);
+        assertThat(errorResponse.getMessage()).contains("Invalid currency symbol");
+    }
+
+    @Test
+    void testInvalidSymbolsWithNumbers_ReturnsErrorResponse() throws Exception {
+        // When - Call endpoint with symbols containing numbers
+        mockMvc.perform(get("/api/v1/rates/2024-01-15")
+                .param("access_key", "test-key")
+                .param("symbols", "USD,GB1"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").exists())
+            .andExpect(jsonPath("$.description").exists());
+    }
 }

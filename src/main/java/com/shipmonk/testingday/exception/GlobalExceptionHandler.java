@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.concurrent.CompletionException;
 
 /**
  * Global exception handler for the application
@@ -156,6 +159,30 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle ResponseStatusException
+     * Thrown by validators and other components using ResponseStatusException
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(
+            ResponseStatusException ex,
+            WebRequest request) {
+
+        HttpStatus status = ex.getStatus();
+        logger.warn("ResponseStatusException: {} - {}", status, ex.getReason());
+
+        ErrorResponse errorResponse = new ErrorResponse(
+            status.value(),
+            status.getReasonPhrase(),
+            status.name(),
+            ex.getReason() != null ? ex.getReason() : status.getReasonPhrase(),
+            ex.getMessage(),
+            request.getDescription(false).replace("uri=", "")
+        );
+
+        return new ResponseEntity<>(errorResponse, status);
+    }
+
+    /**
      * Handle generic exceptions (catch-all)
      */
     @ExceptionHandler(Exception.class)
@@ -170,6 +197,47 @@ public class GlobalExceptionHandler {
             HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
             "INTERNAL_ERROR",
             "An unexpected error occurred",
+            ex.getMessage(),
+            request.getDescription(false).replace("uri=", "")
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Handle CompletionException (for async operations)
+     */
+    @ExceptionHandler(CompletionException.class)
+    public ResponseEntity<ErrorResponse> handleCompletionException(
+            CompletionException ex,
+            WebRequest request) {
+
+        logger.error("Asynchronous operation failed", ex);
+
+        ErrorResponse errorResponse = new ErrorResponse(
+            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+            "ASYNC_OPERATION_FAILED",
+            "An error occurred during asynchronous processing",
+            ex.getMessage(),
+            request.getDescription(false).replace("uri=", "")
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(
+            RuntimeException ex,
+            WebRequest request) {
+
+        logger.error("Runtime exception occurred", ex);
+
+        ErrorResponse errorResponse = new ErrorResponse(
+            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+            "RUNTIME_EXCEPTION",
+            "A runtime error occurred",
             ex.getMessage(),
             request.getDescription(false).replace("uri=", "")
         );
