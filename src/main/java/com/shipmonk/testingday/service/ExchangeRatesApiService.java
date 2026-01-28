@@ -41,7 +41,7 @@ public class ExchangeRatesApiService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${fixer.api.free-key:a0fbcdca0a84fbc406fab744066bb166}")
+    @Value("${fixer.api.key}")
     private String defaultFreeApiKey;
 
     /**
