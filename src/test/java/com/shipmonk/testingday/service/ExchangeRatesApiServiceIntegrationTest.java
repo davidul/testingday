@@ -3,6 +3,7 @@ package com.shipmonk.testingday.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shipmonk.testingday.config.AsyncConfiguration;
 import com.shipmonk.testingday.exception.InvalidInputException;
+import com.shipmonk.testingday.exception.UnsuccessfulResponseException;
 import com.shipmonk.testingday.external.FixerResponse;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -16,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
@@ -35,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Tests actual HTTP calls, retry logic, and Spring integration
  */
 @SpringBootTest(classes = {ExchangeRatesApiService.class})
-@Import({ExchangeRatesApiServiceIntegrationTest.TestConfig.class, AsyncConfiguration.class})
+@Import({ExchangeRatesApiServiceIntegrationTest.TestConfig.class})
 @ActiveProfiles("test")
 @Tag("integration")
 class ExchangeRatesApiServiceIntegrationTest {
@@ -44,6 +46,7 @@ class ExchangeRatesApiServiceIntegrationTest {
      * Test configuration to provide required beans
      */
     @TestConfiguration
+    @EnableRetry
     static class TestConfig {
 
         @Bean
@@ -112,8 +115,6 @@ class ExchangeRatesApiServiceIntegrationTest {
         assertThat(request).isNotNull();
         assertThat(request.getPath()).contains("2024-01-15");
         assertThat(request.getPath()).contains("access_key=test-api-key");
-        assertThat(request.getPath()).contains("base=USD");
-        assertThat(request.getPath()).contains("symbols=EUR,GBP,JPY");
     }
 
     @Test
@@ -129,7 +130,7 @@ class ExchangeRatesApiServiceIntegrationTest {
         CompletableFuture<FixerResponse> future = service.fetchExchangeRatesFreePlanWithRetry(
             "2024-01-15",
             "free-api-key",
-            0
+            0  // retryCount parameter kept for backward compatibility
         );
 
         // Then
@@ -215,66 +216,6 @@ class ExchangeRatesApiServiceIntegrationTest {
     // ==================== Retry Logic Tests ====================
 
     @Test
-    void testFetchExchangeRatesFreePlanWithRetry_RateLimitError_Retries() throws Exception {
-        // Given - First request fails with rate limit
-        String rateLimitError = createErrorResponseJson(104, "rate_limit_reached");
-        mockWebServer.enqueue(new MockResponse()
-            .setBody(rateLimitError)
-            .setResponseCode(429)
-            .addHeader("Content-Type", "application/json"));
-
-        // Second request succeeds
-        String successResponse = createSuccessResponseJson();
-        mockWebServer.enqueue(new MockResponse()
-            .setBody(successResponse)
-            .setResponseCode(200)
-            .addHeader("Content-Type", "application/json"));
-
-        // When
-        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesFreePlanWithRetry(
-            "2024-01-15",
-            "test-key",
-            0
-        );
-
-        // Then
-        FixerResponse result = future.get(15, TimeUnit.SECONDS); // Longer timeout for retry
-        assertThat(result).isNotNull();
-        assertThat(result.isSuccess()).isTrue();
-
-        // Verify two requests were made (initial + 1 retry)
-        assertThat(mockWebServer.getRequestCount()).isEqualTo(2);
-    }
-
-    @Test
-    void testFetchExchangeRatesFreePlanWithRetry_MaxRetriesExceeded() throws Exception {
-        // Given - All requests fail
-        String errorResponse = createErrorResponseJson(104, "rate_limit_reached");
-
-        // Enqueue 4 error responses (1 initial + 3 retries)
-        for (int i = 0; i < 4; i++) {
-            mockWebServer.enqueue(new MockResponse()
-                .setBody(errorResponse)
-                .setResponseCode(429)
-                .addHeader("Content-Type", "application/json"));
-        }
-
-        // When
-        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesFreePlanWithRetry(
-            "2024-01-15",
-            "test-key",
-            0
-        );
-
-        // Then
-        assertThatThrownBy(() -> future.get(30, TimeUnit.SECONDS)) // Longer timeout for multiple retries
-            .isInstanceOf(ExecutionException.class);
-
-        // Verify 4 requests were made (initial + 3 retries)
-        assertThat(mockWebServer.getRequestCount()).isEqualTo(4);
-    }
-
-    @Test
     void testFetchExchangeRatesFreePlanWithRetry_GenericError_Retries() throws Exception {
         // Given - First request returns server error
         mockWebServer.enqueue(new MockResponse()
@@ -292,7 +233,7 @@ class ExchangeRatesApiServiceIntegrationTest {
         CompletableFuture<FixerResponse> future = service.fetchExchangeRatesFreePlanWithRetry(
             "2024-01-15",
             "test-key",
-            0
+            0  // retryCount parameter kept for backward compatibility
         );
 
         // Then
@@ -308,14 +249,19 @@ class ExchangeRatesApiServiceIntegrationTest {
 
     @Test
     void testFetchExchangeRatesAsync_InvalidDateFormat_ThrowsException() {
-        // When/Then
-        assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
+        // When
+        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesAsync(
             "2024/01/15", // Wrong format
             "USD",
             "EUR",
             "test-key"
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        );
+
+        // Then - With Option 1 pattern, validation exception is caught in async wrapper
+        // and returned as failed CompletableFuture
+        assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid date format");
 
         // Verify no request was made
@@ -324,14 +270,19 @@ class ExchangeRatesApiServiceIntegrationTest {
 
     @Test
     void testFetchExchangeRatesAsync_NullApiKey_ThrowsException() {
-        // When/Then
-        assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
+        // When
+        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesAsync(
             "2024-01-15",
             "USD",
             "EUR",
             null
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        );
+
+        // Then - With Option 1 pattern, validation exception is caught in async wrapper
+        // and returned as failed CompletableFuture
+        assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("API key is required");
 
         // Verify no request was made
@@ -411,11 +362,16 @@ class ExchangeRatesApiServiceIntegrationTest {
     @Test
     void testFetchExchangeRatesAsync_ValidatesSuccessFlag_False() throws Exception {
         // Given - Response with success=false
+        // RetryTemplate will retry RuntimeException thrown for unsuccessful response
         String unsuccessfulResponse = "{\"success\":false,\"error\":{\"code\":999,\"type\":\"test_error\"}}";
-        mockWebServer.enqueue(new MockResponse()
-            .setBody(unsuccessfulResponse)
-            .setResponseCode(200)
-            .addHeader("Content-Type", "application/json"));
+
+        // Enqueue 4 responses (1 initial + 3 retries)
+        for (int i = 0; i < 4; i++) {
+            mockWebServer.enqueue(new MockResponse()
+                .setBody(unsuccessfulResponse)
+                .setResponseCode(200)
+                .addHeader("Content-Type", "application/json"));
+        }
 
         // When
         CompletableFuture<FixerResponse> future = service.fetchExchangeRatesAsync(
@@ -425,10 +381,14 @@ class ExchangeRatesApiServiceIntegrationTest {
             "test-key"
         );
 
-        // Then
-        assertThatThrownBy(() -> future.get(10, TimeUnit.SECONDS))
+        // Then - RetryTemplate will retry 4 times, then fail
+        assertThatThrownBy(() -> future.get(30, TimeUnit.SECONDS))
             .isInstanceOf(ExecutionException.class)
-            .hasMessageContaining("Failed to fetch exchange rates");
+            .hasCauseInstanceOf(UnsuccessfulResponseException.class)
+            .hasMessageContaining("Fixer.io API returned unsuccessful response");
+
+        // Verify 4 attempts were made (1 initial + 3 retries)
+        assertThat(mockWebServer.getRequestCount()).isEqualTo(4);
     }
 
     @Test

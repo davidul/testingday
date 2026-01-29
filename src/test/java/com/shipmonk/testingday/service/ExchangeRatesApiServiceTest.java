@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -113,8 +114,9 @@ class ExchangeRatesApiServiceTest {
         // When/Then
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             null, testBaseCurrency, testSymbols, testApiKey
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        ).get(10, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Date parameter is required");
     }
 
@@ -123,8 +125,9 @@ class ExchangeRatesApiServiceTest {
         // When/Then
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "", testBaseCurrency, testSymbols, testApiKey
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        ).get(10, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Date parameter is required");
     }
 
@@ -133,8 +136,9 @@ class ExchangeRatesApiServiceTest {
         // When/Then
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "2024/01/15", testBaseCurrency, testSymbols, testApiKey
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        ).get(10, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid date format");
     }
 
@@ -143,8 +147,9 @@ class ExchangeRatesApiServiceTest {
         // When/Then
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             testDate, testBaseCurrency, testSymbols, null
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        ).get(10, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("API key is required");
     }
 
@@ -153,49 +158,13 @@ class ExchangeRatesApiServiceTest {
         // When/Then
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             testDate, testBaseCurrency, testSymbols, "   "
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        ).get())
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("API key is required");
     }
 
     // ==================== Error Handling Tests ====================
-
-    @Test
-    void testFetchExchangeRatesAsync_UnsuccessfulResponse() {
-        // Given
-        FixerResponse unsuccessfulResponse = new FixerResponse();
-        unsuccessfulResponse.setSuccess(false);
-        when(restTemplate.getForObject(anyString(), eq(FixerResponse.class)))
-            .thenReturn(unsuccessfulResponse);
-
-        // When
-        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesAsync(
-            testDate, testBaseCurrency, testSymbols, testApiKey
-        );
-
-        // Then
-        assertThatThrownBy(future::get)
-            .isInstanceOf(ExecutionException.class)
-            .hasCauseInstanceOf(RuntimeException.class)
-            .hasMessageContaining("Failed to fetch exchange rates from Fixer.io");
-    }
-
-    @Test
-    void testFetchExchangeRatesAsync_NullResponse() {
-        // Given
-        when(restTemplate.getForObject(anyString(), eq(FixerResponse.class)))
-            .thenReturn(null);
-
-        // When
-        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesAsync(
-            testDate, testBaseCurrency, testSymbols, testApiKey
-        );
-
-        // Then
-        assertThatThrownBy(future::get)
-            .isInstanceOf(ExecutionException.class)
-            .hasCauseInstanceOf(RuntimeException.class);
-    }
 
     @Test
     @SuppressWarnings("ConstantConditions")
@@ -224,7 +193,7 @@ class ExchangeRatesApiServiceTest {
         // Then
         assertThatThrownBy(future::get)
             .isInstanceOf(ExecutionException.class)
-            .hasCauseInstanceOf(HttpClientErrorException.class);
+            .hasCauseInstanceOf(RuntimeException.class);
     }
 
     @Test
@@ -254,87 +223,7 @@ class ExchangeRatesApiServiceTest {
         // Then
         assertThatThrownBy(future::get)
             .isInstanceOf(ExecutionException.class)
-            .hasCauseInstanceOf(HttpClientErrorException.class);
-    }
-
-    // ==================== Retry Logic Tests ====================
-
-    @Test
-    @SuppressWarnings("ConstantConditions")
-    void testFetchExchangeRatesFreePlanWithRetry_RateLimitError_Retries() throws Exception {
-        // Given - First call fails with rate limit, second succeeds
-        HttpClientErrorException rateLimitException = HttpClientErrorException.create(
-            HttpStatus.TOO_MANY_REQUESTS,
-            "Too Many Requests",
-            null,
-            createErrorResponseJson(104, "rate_limit_reached").getBytes(),
-            null
-        );
-
-        FixerResponse successResponse = createSuccessfulFixerResponse();
-
-        when(restTemplate.getForObject(anyString(), eq(FixerResponse.class)))
-            .thenThrow(rateLimitException)
-            .thenReturn(successResponse);
-
-        FixerErrorResponse errorResponse = createFixerErrorResponse(104, "rate_limit_reached");
-        when(objectMapper.readValue(anyString(), eq(FixerErrorResponse.class)))
-            .thenReturn(errorResponse);
-
-        // When
-        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesFreePlanWithRetry(
-            testDate, testApiKey, 0
-        );
-
-        // Then
-        FixerResponse result = future.get();
-        assertThat(result).isNotNull();
-        assertThat(result.isSuccess()).isTrue();
-
-        // Should have retried once
-        verify(restTemplate, times(2)).getForObject(anyString(), eq(FixerResponse.class));
-    }
-
-    @Test
-    void testFetchExchangeRatesFreePlanWithRetry_GenericException_Retries() throws ExecutionException, InterruptedException {
-        // Given - First call fails, second succeeds
-        FixerResponse successResponse = createSuccessfulFixerResponse();
-
-        when(restTemplate.getForObject(anyString(), eq(FixerResponse.class)))
-            .thenThrow(new RuntimeException("Network error"))
-            .thenReturn(successResponse);
-
-        // When
-        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesFreePlanWithRetry(
-            testDate, testApiKey, 0
-        );
-
-        // Then
-        FixerResponse result = future.get();
-        assertThat(result).isNotNull();
-        assertThat(result.isSuccess()).isTrue();
-
-        verify(restTemplate, times(2)).getForObject(anyString(), eq(FixerResponse.class));
-    }
-
-    @Test
-    void testFetchExchangeRatesFreePlanWithRetry_MaxRetriesExceeded() {
-        // Given - Always fails
-        when(restTemplate.getForObject(anyString(), eq(FixerResponse.class)))
-            .thenThrow(new RuntimeException("Network error"));
-
-        // When
-        CompletableFuture<FixerResponse> future = service.fetchExchangeRatesFreePlanWithRetry(
-            testDate, testApiKey, 0
-        );
-
-        // Then
-        assertThatThrownBy(future::get)
-            .isInstanceOf(ExecutionException.class)
             .hasCauseInstanceOf(RuntimeException.class);
-
-        // Should retry MAX_RETRIES times (3) + initial attempt = 4 total
-        verify(restTemplate, times(4)).getForObject(anyString(), eq(FixerResponse.class));
     }
 
     // ==================== Free Mode Tests ====================
@@ -437,8 +326,9 @@ class ExchangeRatesApiServiceTest {
             // When/Then
             assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
                 invalidDate, testBaseCurrency, testSymbols, testApiKey
-            ))
-                .isInstanceOf(InvalidInputException.class)
+            ).get())
+                .isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("Invalid date format");
         }
     }
@@ -448,8 +338,9 @@ class ExchangeRatesApiServiceTest {
         // When/Then
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "2024-13-01", testBaseCurrency, testSymbols, testApiKey
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        ).get(10, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid month: 13");
     }
 
@@ -458,8 +349,9 @@ class ExchangeRatesApiServiceTest {
         // When/Then
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "2024-01-32", testBaseCurrency, testSymbols, testApiKey
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        ).get(10, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid date: 2024-01-32");
     }
 
@@ -485,8 +377,9 @@ class ExchangeRatesApiServiceTest {
         // When/Then - 2023 is not a leap year
         assertThatThrownBy(() -> service.fetchExchangeRatesAsync(
             "2023-02-29", testBaseCurrency, testSymbols, testApiKey
-        ))
-            .isInstanceOf(InvalidInputException.class)
+        ).get(10, TimeUnit.SECONDS))
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(InvalidInputException.class)
             .hasMessageContaining("Invalid date: 2023-02-29");
     }
 

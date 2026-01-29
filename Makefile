@@ -19,6 +19,12 @@
 #   make build-run-dev      - Build and run in DEV profile
 #   make build-run-prod     - Build and run in PROD profile
 #
+# Testing & Reports:
+#   make test               - Run unit tests only
+#   make test-all           - Run unit and integration tests
+#   make test-report        - Generate test reports with coverage
+#   make view-report        - Open test reports in browser
+#
 # Docker Commands:
 #   make docker-build       - Build Docker image
 #   make docker-run         - Run application in Docker container
@@ -32,7 +38,7 @@
 # ========================================
 
 
-.PHONY: help postgres-up postgres-down postgres-ps postgres-clean schema-up schema-down build run run-dev run-prod dev prod build-run-dev build-run-prod docker-build docker-run docker-stop docker-logs docker-up docker-down docker-restart docker-clean
+.PHONY: help postgres-up postgres-down postgres-ps postgres-clean schema-up schema-down build run run-dev run-prod dev prod build-run-dev build-run-prod test test-all test-report view-report docker-build docker-run docker-stop docker-logs docker-up docker-down docker-restart docker-clean
 
 # Default target - show help when running 'make' without arguments
 .DEFAULT_GOAL := help
@@ -47,6 +53,23 @@ help:
 	@echo "  make postgres-down    - Stop and remove PostgreSQL container"
 	@echo "  make postgres-ps      - Check PostgreSQL container status"
 	@echo "  make postgres-clean   - Remove PostgreSQL data volume (WARNING: deletes all data)"
+	@echo ""
+	@echo "Application Build & Run:"
+	@echo "  make build            - Build the application JAR"
+	@echo "  make build-skip-tests - Build the application JAR skipping tests"
+	@echo "  make run              - Run with default profile (dev)"
+	@echo "  make run-dev          - Run JAR with DEV profile"
+	@echo "  make run-prod         - Run JAR with PROD profile"
+	@echo "  make dev              - Run with Maven in DEV profile (hot reload)"
+	@echo "  make prod             - Run with Maven in PROD profile"
+	@echo "  make build-run-dev    - Build and run in DEV profile"
+	@echo "  make build-run-prod   - Build and run in PROD profile"
+	@echo ""
+	@echo "Testing & Reports:"
+	@echo "  make test             - Run unit tests only"
+	@echo "  make test-all         - Run unit and integration tests"
+	@echo "  make test-report      - Generate comprehensive test reports with coverage"
+	@echo "  make view-report      - Open test reports in browser"
 	@echo ""
 	@echo "Application Build & Run:"
 	@echo "  make build            - Build the application JAR"
@@ -141,6 +164,42 @@ build-run-dev: build run-dev
 
 # Build and run in PROD
 build-run-prod: build run-prod
+
+# ========================================
+# Testing & Test Reports
+# ========================================
+
+# Run unit tests only
+test:
+	./mvnw clean test
+
+# Run unit and integration tests
+test-all:
+	./mvnw clean verify
+
+# Generate comprehensive test reports with coverage
+test-report:
+	@echo "=========================================="
+	@echo "Generating Test Reports"
+	@echo "=========================================="
+	./mvnw clean test verify site
+	@echo ""
+	@echo "=========================================="
+	@echo "Test Reports Generated Successfully!"
+	@echo "=========================================="
+	@echo ""
+	@echo "Reports available at:"
+	@echo "  - Test Results:        target/site/surefire-report.html"
+	@echo "  - Code Coverage:       target/site/jacoco/index.html"
+	@echo "  - Full Site:           target/site/index.html"
+	@echo ""
+	@echo "Run 'make view-report' to open in browser"
+	@echo ""
+
+# Open test reports in browser
+view-report:
+	@echo "Opening test reports in browser..."
+	open target/site/index.html || xdg-open target/site/index.html || echo "Please open target/site/index.html manually"
 
 # ========================================
 # Docker Commands

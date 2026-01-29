@@ -38,7 +38,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(AsyncConfiguration.class)
 @ActiveProfiles("test")
 @Tag("integration")
 class ExchangeRatesControllerIntegrationTest {
@@ -335,14 +334,14 @@ class ExchangeRatesControllerIntegrationTest {
                 .param("symbols", symbols)
                 .param("access_key", apiKey)
                 .contentType(MediaType.APPLICATION_JSON))
-            .andExpect(status().isBadGateway());
+            .andExpect(status().isInternalServerError());
 
         verify(cachedService, times(1)).getCachedRates(eq(LocalDate.parse(date)), eq("EUR"));
         verify(cachedService, never()).saveToCache(any(), any(), any());
     }
 
     @Test
-    void testGetRates_WhenApiReturnsInvalidJson_ReturnsBadGateway() throws Exception {
+    void testGetRates_WhenApiReturnsInvalidJson_ReturnsInternalServerError() throws Exception {
         // Given
         String date = "2024-01-15";
         String symbols = "USD,GBP,CAD";
@@ -363,7 +362,7 @@ class ExchangeRatesControllerIntegrationTest {
                 .param("symbols", symbols)
                 .param("access_key", apiKey)
                 .contentType(MediaType.APPLICATION_JSON))
-            .andExpect(status().isBadGateway());
+            .andExpect(status().isInternalServerError());
 
         verify(cachedService, times(1)).getCachedRates(eq(LocalDate.parse(date)), eq("EUR"));
         verify(cachedService, never()).saveToCache(any(), any(), any());
